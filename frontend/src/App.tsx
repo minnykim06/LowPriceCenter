@@ -3,99 +3,23 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import { PrivateRoute } from "src/components/PrivateRoute";
 import { RootLayout } from "src/components/RootLayout";
 import { Messages } from "src/components/messages/Messages";
-import { Home } from "src/pages";
 import { AddProduct } from "src/pages/AddProduct";
 import { EditProduct } from "src/pages/EditProduct";
+import { Home } from "src/pages/Home";
 import { IndividualProductPage } from "src/pages/Individual-product-page";
 import { Marketplace } from "src/pages/Marketplace";
-
-import { PrivateRoute } from "../src/components/PrivateRoute";
-import { AddProduct } from "../src/pages/AddProduct";
-import { EditProduct } from "../src/pages/EditProduct";
-import { IndividualProductPage } from "../src/pages/Individual-product-page";
-import { PageNotFound } from "../src/pages/PageNotFound";
-import FirebaseProvider from "../src/utils/FirebaseProvider";
-import { SavedProducts } from "./pages/SavedProducts";
-import { StudentOrgProfile } from "./pages/StudentOrgProfile";
-import { StudentOrganizations } from "./pages/StudentOrganizations";
-import { StudentOrganizationPublicProfile } from "./pages/StudentOrganizationPublicProfile";
 import { PageNotFound } from "src/pages/PageNotFound";
+import { Profile } from "src/pages/Profile";
 import { SavedProducts } from "src/pages/SavedProducts";
+import { StudentOrgProfile } from "src/pages/StudentOrgProfile";
+import { StudentOrganizations } from "src/pages/StudentOrganizations";
+import { StudentOrganizationPublicProfile } from "src/pages/StudentOrganizationPublicProfile";
 import ChatProvider from "src/utils/ChatProvider";
 import FirebaseProvider from "src/utils/FirebaseProvider";
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Home />,
-  },
-  {
-    path: "/products",
-    element: (
-      <PrivateRoute>
-        <Marketplace />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/add-product",
-    element: (
-      <PrivateRoute>
-        <AddProduct />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/edit-product/:id",
-    element: (
-      <PrivateRoute>
-        <EditProduct />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/products/:id",
-    element: (
-      <PrivateRoute>
-        <IndividualProductPage />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/saved-products",
-    element: (
-      <PrivateRoute>
-        <SavedProducts />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/student-org-profile",
-    element: (
-      <PrivateRoute>
-        <StudentOrgProfile />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/student-organizations",
-    element: (
-      <PrivateRoute>
-        <StudentOrganizations />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/student-organizations/:id",
-    element: (
-      <PrivateRoute>
-        <StudentOrganizationPublicProfile />
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "*",
-    element: <PageNotFound />,
     element: <RootLayout />,
     children: [
       {
@@ -107,6 +31,14 @@ const router = createBrowserRouter([
         element: (
           <PrivateRoute>
             <Marketplace />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/profile",
+        element: (
+          <PrivateRoute>
+            <Profile />
           </PrivateRoute>
         ),
       },
@@ -151,6 +83,30 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "/student-org-profile",
+        element: (
+          <PrivateRoute>
+            <StudentOrgProfile />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/student-organizations",
+        element: (
+          <PrivateRoute>
+            <StudentOrganizations />
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "/student-organizations/:id",
+        element: (
+          <PrivateRoute>
+            <StudentOrganizationPublicProfile />
+          </PrivateRoute>
+        ),
+      },
+      {
         path: "*",
         element: <PageNotFound />,
       },
@@ -173,3 +129,4 @@ export default function App() {
     </HelmetProvider>
   );
 }
+

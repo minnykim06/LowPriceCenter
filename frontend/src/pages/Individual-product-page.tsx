@@ -1,26 +1,14 @@
+import { faPenToSquare } from "@fortawesome/free-solid-svg-icons";
+import { faHeart as faHeartSolid } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
-import {
-  faArrowUp,
-  faCheck,
-  faHeart as faHeartSolid,
-  faPenToSquare,
-} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { EmblaOptionsType } from "embla-carousel";
-import { Suspense, lazy, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { get, patch, post } from "src/api/requests";
-import EmblaCarousel from "src/components/EmblaCarousel";
+import { get, post } from "src/api/requests";
 import { FirebaseContext } from "src/utils/FirebaseProvider";
-
-import type { PickupLocation } from "src/utils/pickupLocation";
-
-const ListingMap = lazy(() => import("src/components/ListingMap"));
-const priceCenterCoordinates = {
-  lat: 32.8793,
-  lng: -117.2367,
-};
+import EmblaCarousel from "src/components/EmblaCarousel";
+import { EmblaOptionsType } from "embla-carousel";
 
 export function IndividualProductPage() {
   const navigate = useNavigate();
@@ -29,12 +17,13 @@ export function IndividualProductPage() {
   const [product, setProduct] = useState<{
     name: string;
     price: number;
+    year: number;
+    category: string;
+    condition: string;
+    location: string;
     images: string[];
     userEmail: string;
     description: string;
-    isMarkedSold: boolean;
-    tags: string[];
-    pickupLocation?: PickupLocation;
   }>();
   const [error, setError] = useState<string>();
   const [hasPermissions, setHasPermissions] = useState<boolean>(false);
@@ -137,43 +126,16 @@ export function IndividualProductPage() {
       setIsSubmitting(false);
     }
   };
-
-  const handleMarkSold = async () => {
-    if (!product) return;
-    const body = new FormData();
-    body.append("name", product.name);
-    body.append("price", product.price.toString());
-    body.append("description", product.description);
-    body.append("userEmail", product.userEmail);
-    body.append("existingImagesJson", JSON.stringify(product.images));
-    body.append("isMarkedSold", String(!product.isMarkedSold));
-
-    await patch(`/api/products/${id}`, body)
-      .then(async (res) => {
-        const response = await res.json();
-        if (res.ok) {
-          setProduct(response.updatedProduct);
-          navigate(`/products/${id}`);
-        } else {
-          alert("Failed to update product");
-          console.log(response);
-        }
-      })
-      .catch((e) => {
-        console.log(e);
-      });
-  };
-
   const isCooling = Boolean(cooldownEnd && Date.now() < cooldownEnd);
   // const secondsLeft = isCooling ? Math.ceil((cooldownEnd! - Date.now()) / 1000) : 0;
   const msLeft = isCooling ? cooldownEnd! - Date.now() : 0;
   const totalMinutes = Math.ceil(msLeft / (1000 * 60)); // convert ms → minutes
   const hoursLeft = Math.floor(totalMinutes / 60);
   const minutesLeft = totalMinutes % 60;
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!isCooling) return;
-    const iv = setInterval(() => setTick((t) => t + 1), 60_000); // 60,000 ms = 1 min
+    const iv = setInterval(() => setTick((t) => t + 1), 60_000); // 60 000 ms = 1 min
     return () => clearInterval(iv);
   }, [isCooling]);
   let buttonLabel = "Interested?";
@@ -203,16 +165,10 @@ export function IndividualProductPage() {
       const userRes = await get(`/api/users/${user.uid}`);
       const userData = await userRes.json();
       setIsSaved(userData.savedProducts.includes(id));
-    } catch (caughtError) {
-      console.error("Error saving product:", caughtError);
+    } catch (error) {
+      console.error("Error saving product:", error);
     }
   };
-
-  const pickupLocation = product?.pickupLocation;
-  const pickupMapCenter = pickupLocation
-    ? { lat: pickupLocation.lat, lng: pickupLocation.lng }
-    : priceCenterCoordinates;
-  const pickupAddressLabel = pickupLocation?.address ?? "UCSD Price Center";
 
   return (
     <>
@@ -251,7 +207,7 @@ export function IndividualProductPage() {
                       ? product.images[currentIndex]
                       : "/productImages/product-placeholder.webp"
                   }
-                  alt={`${product?.name} preview ${currentIndex + 1}`}
+                  alt={`Image ${currentIndex + 1} of ${product?.name}`}
                   className="w-full h-full object-contain"
                 />
                 <button
@@ -282,35 +238,9 @@ export function IndividualProductPage() {
 
               <hr className="my-6 w-full mx-auto h-0 border-[1px] border-solid border-gray-300" />
 
-              {hasPermissions &&
-                (product?.isMarkedSold ? (
-                  <button
-                    className="text-lg font-inter py-4 mb-6 font-bold border border-ucsd-blue text-ucsd-blue rounded-md"
-                    onClick={handleMarkSold}
-                  >
-                    Renew on Marketplace <FontAwesomeIcon icon={faArrowUp} />
-                  </button>
-                ) : (
-                  <button
-                    className="text-lg font-inter py-4 mb-6 font-bold bg-ucsd-blue hover:bg-ucsd-darkblue text-white rounded-md transition-colors"
-                    onClick={handleMarkSold}
-                  >
-                    Mark as Sold <FontAwesomeIcon icon={faCheck} />
-                  </button>
-                ))}
-
               <h2 className="font-inter text-[#35393C] text-base md:text-xl font-normal pb-6">
                 USD ${product?.price?.toFixed(2)}
               </h2>
-              {product?.isMarkedSold && (
-                <div className="bg-red-100 p-5 mb-6">
-                  <p className="font-inter text-black text-base md:text-xl font-normal break-words">
-                    {hasPermissions
-                      ? "This product has been marked as sold. It will not appear on the marketplace, but others can still be find it under your profile."
-                      : "This product is no longer available."}
-                  </p>
-                </div>
-              )}
               {product?.description && (
                 <div className="bg-[#F5F0E6] p-5 mb-6">
                   <p className="font-inter text-black text-base md:text-xl font-normal break-words">
@@ -318,58 +248,41 @@ export function IndividualProductPage() {
                   </p>
                 </div>
               )}
-              {product?.tags && (
-                <div className="flex flex-row flex-wrap gap-2 py-4">
-                  {product.tags.map((tag) => (
-                    <div
-                      key={tag}
-                      className="flex items-center gap-2 p-1 px-2 w-fit bg-slate-200 rounded-2xl"
-                    >
-                      <span className="text-sm font-medium">{tag}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <section className="mt-4">
-                <h2 className="font-inter text-lg font-semibold text-[#182B49]">Pickup Location</h2>
-                <p className="mt-2 font-inter text-sm leading-6 text-[#4B5563]">
-                  {pickupLocation?.address ??
-                    "Older listings still default to UCSD Price Center until a pickup address is added."}
+              <div className="bg-[#F5F0E6] p-5 mb-6">
+                <p className="font-inter text-black text-base md:text-xl font-normal break-words">
+                  {product?.year}
                 </p>
-                <Suspense
-                  fallback={
-                    <div
-                      className="mt-4 h-64 animate-pulse rounded-2xl border border-gray-200 bg-[#F8F8F8]"
-                      aria-label="Loading pickup map section"
-                    />
-                  }
-                >
-                  <ListingMap
-                    center={pickupMapCenter}
-                    className="mt-4"
-                    label={pickupAddressLabel}
-                    markerTitle={pickupAddressLabel}
-                    placeId={pickupLocation?.placeId}
-                  />
-                </Suspense>
-              </section>
+              </div>
+              <div className="bg-[#F5F0E6] p-5 mb-6">
+                <p className="font-inter text-black text-base md:text-xl font-normal break-words">
+                  {product?.category}
+                </p>
+              </div>
+              <div className="bg-[#F5F0E6] p-5 mb-6">
+                <p className="font-inter text-black text-base md:text-xl font-normal break-words">
+                  {product?.condition}
+                </p>
+              </div>
               {!hasPermissions && (
-                <button
-                  onClick={!isCooling ? handleSendInterestEmail : undefined}
+                <div
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
-                  className={`
-                    font-inter text-[#00629B]
-                    text-base md:text-xl font-light mt-6
-                    bg-white border border-[#00629B]
-                    px-4 py-2 rounded-lg
-                    transition-colors duration-200 ease-in-out
-                    ${!isCooling ? "hover:bg-blue-100" : ""}
-                    ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
-                    `}
                 >
-                  {buttonLabel}
-                </button>
+                  <button
+                    onClick={!isCooling ? handleSendInterestEmail : undefined}
+                    className={`
+                      font-inter text-[#00629B]
+                      text-base md:text-xl font-light mt-6
+                      bg-white border border-[#00629B]
+                      px-4 py-2 rounded-lg
+                      transition-colors duration-200 ease-in-out
+                      ${!isCooling ? "hover:bg-blue-100" : ""}
+                      ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
+                  >
+                    {buttonLabel}
+                  </button>
+                </div>
               )}
             </section>
           </div>

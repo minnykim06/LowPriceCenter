@@ -242,17 +242,17 @@ export function IndividualProductPage() {
 
             {/* Info Section */}
             <section className="max-w-[100%] md:max-w-[50%] flex-1 flex flex-col">
-              <h1 className="pt-2 font-jetbrains text-black font-bold text-4xl break-words mb-3">
+              <h1 className="pt-2 font-jetbrains-mono text-black font-bold text-4xl break-words mb-3">
                 {product?.name}
               </h1>
               <div className="h-px w-full bg-gray-200 mb-4" />
 
               {/* Price - Prominent Display */}
               <div className="mb-6">
-                <h2 className="font-jetbrains text-[#00629B] text-3xl md:text-4xl font-bold">
+                <h2 className="font-jetbrains-mono text-black text-3xl md:text-4xl font-extrabold">USD 
                   ${product?.price?.toFixed(2)}
                 </h2>
-                <p className="font-inter text-gray-500 text-sm mt-1">USD</p>
+                
               </div>
 
               {/* Product Details Grid */}

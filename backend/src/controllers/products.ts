@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 import { bucket } from "src/config/firebase"; // Import Firebase bucket
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid"; // For unique filenames
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { firebaseConfig } from "src/config/firebaseConfig";
 import multer from "multer";
 
@@ -79,20 +79,20 @@ export const addProduct = [
 
       const images: string[] = [];
       if (req.files && Array.isArray(req.files)) {
-        const app = initializeApp(firebaseConfig);
+        const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
         const storage = getStorage(app);
 
-        for (const file of req.files as Express.Multer.File[]) {
-          const fileName = `${uuidv4()}-${file.originalname}`;
-          const firebaseFile = bucket.file(fileName);
-
-          await firebaseFile.save(file.buffer, {
-            metadata: { contentType: file.mimetype },
-          });
-
-          const imageUrl = await getDownloadURL(ref(storage, fileName));
-          images.push(imageUrl);
-        }
+        const urls = await Promise.all(
+          (req.files as Express.Multer.File[]).map(async (file) => {
+            const fileName = `${uuidv4()}-${file.originalname}`;
+            const firebaseFile = bucket.file(fileName);
+            await firebaseFile.save(file.buffer, {
+              metadata: { contentType: file.mimetype },
+            });
+            return await getDownloadURL(ref(storage, fileName));
+          }),
+        );
+        images.push(...urls);
       }
 
       const newProduct = new ProductModel({
@@ -174,15 +174,16 @@ export const updateProductById = [
       let existing = req.body.existingImages || [];
       if (!Array.isArray(existing)) existing = [existing];
 
-      const newUrls: string[] = [];
-      const app = initializeApp(firebaseConfig);
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
       const storage = getStorage(app);
-      for (const file of req.files as Express.Multer.File[]) {
-        const name = `${uuidv4()}-${file.originalname}`;
-        const bucketFile = bucket.file(name);
-        await bucketFile.save(file.buffer, { metadata: { contentType: file.mimetype } });
-        newUrls.push(await getDownloadURL(ref(storage, name)));
-      }
+      const newUrls = await Promise.all(
+        (req.files as Express.Multer.File[]).map(async (file) => {
+          const name = `${uuidv4()}-${file.originalname}`;
+          const bucketFile = bucket.file(name);
+          await bucketFile.save(file.buffer, { metadata: { contentType: file.mimetype } });
+          return await getDownloadURL(ref(storage, name));
+        }),
+      );
 
       const finalImages = [...existing, ...newUrls];
 

@@ -333,7 +333,7 @@ export function IndividualProductPage() {
               </div>
 
               {/* Dynamic button section: Edit if owner, Interest Email if viewer */}
-              <div className="flex justify-center mt-8">
+              <div className="flex justify-left mt-8">
                 {hasPermissions ? (
                   <button
                     className="bg-ucsd-blue text-white font-inter text-lg md:text-xl px-8 py-3 rounded-lg hover:brightness-90 transition-all duration-200"

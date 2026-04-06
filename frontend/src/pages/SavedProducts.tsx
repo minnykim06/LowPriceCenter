@@ -14,7 +14,6 @@ export function SavedProducts() {
       year: number;
       category: string;
       condition: string;
-      location: string;
       images: string[];
     }>
   >([]);
@@ -37,7 +36,10 @@ export function SavedProducts() {
       const productPromises = savedProductIds.map((id: string) =>
         get(`/api/products/${id}`).then((res) => res.json()),
       );
-      const savedProducts = await Promise.all(productPromises);
+      const results = await Promise.allSettled(productPromises);
+      const savedProducts = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => (result as PromiseFulfilledResult<any>).value);
       setProducts(savedProducts);
     } catch (err) {
       setError("Failed to load saved products");
@@ -100,19 +102,15 @@ export function SavedProducts() {
                     productYear={product.year}
                     productCategory={product.category}
                     productCondition={product.condition}
-                    productLocation={product.location}
-                    productImages={
-                      product.images && product.images.length > 0
-                        ? product.images
-                        : ["/productImages/product-placeholder.webp"]
-                    }
+                    productImages={product.images && product.images.length > 0
+                      ? product.images
+                      : ["/productImages/product-placeholder.webp"]}
                     isSaved={true}
                     onSaveToggle={(productId, newSavedStatus) => {
                       if (!newSavedStatus) {
                         handleProductUnsave(productId);
                       }
-                    }}
-                  />
+                    } } productLocation={""}                  />
                 </Link>
               </div>
             ))}

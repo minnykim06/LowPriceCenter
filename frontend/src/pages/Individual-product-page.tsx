@@ -1,7 +1,14 @@
 import { faPenToSquare } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartSolid } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
-import { faCalendar, faTag, faCheckCircle, faMapMarkerAlt } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCalendar,
+  faTag,
+  faCheckCircle,
+  faMapMarkerAlt,
+  faChevronLeft,
+  faChevronRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
@@ -171,13 +178,29 @@ export function IndividualProductPage() {
     }
   };
 
+  const hasMultipleImages = Boolean(product?.images && product.images.length > 1);
+  const goToPreviousImage = () => {
+    if (!product?.images || product.images.length === 0) return;
+    setCurrentIndex((prev) =>
+      prev === 0 ? product.images.length - 1 : prev - 1,
+    );
+  };
+
+  const goToNextImage = () => {
+    if (!product?.images || product.images.length === 0) return;
+    setCurrentIndex((prev) =>
+      prev === product.images.length - 1 ? 0 : prev + 1,
+    );
+  };
+
   return (
     <>
       <Helmet>
         <title>{`${product?.name} - Low-Price Center`}</title>
       </Helmet>
       <main className="w-[80%] max-w-screen-2xl mx-auto m-12">
-        <div className="flex justify-end">
+        {/* Edit Product button moved to dynamic section below */}
+        {/* <div className="flex justify-end">
           {hasPermissions && (
             <button
               className="text-lg mb-4 font-inter hover:underline"
@@ -186,7 +209,7 @@ export function IndividualProductPage() {
               Edit Product <FontAwesomeIcon icon={faPenToSquare} />
             </button>
           )}
-        </div>
+        </div> */}
         {/* Error message if product not found */}
         {error && <p className="max-w-[80%] w-full px-3 text-red-800">{error}</p>}
         {/* Display product */}
@@ -194,8 +217,14 @@ export function IndividualProductPage() {
           <div className="flex flex-wrap flex-col md:flex-row mb-6 gap-12">
             {/* Image Section */}
             <section className="w-full flex-1 flex flex-col items-center space-y-12 md:h-auto">
-              <div className="bg-[#00629B] p-4 rounded-xl w-full max-w-[40rem]">
-                <div className="max-h-[24rem] h-[24rem] w-full relative">
+              <button
+                className="text-black font-inter text-lg hover:underline transition self-start"
+                onClick={() => navigate(backPath)}
+              >
+                &larr; Return to {from === "saved" ? "Saved Products" : "Marketplace"}
+              </button>
+              <div className="w-full max-w-[40rem] rounded-2xl bg-[#F5F5F5] flex items-center justify-center p-4">
+                <div className="max-h-[24rem] h-[24rem] w-full relative rounded-xl overflow-hidden bg-[#F5F5F5]">
                   <img
                     src={
                       product?.images && product.images.length > 0
@@ -205,6 +234,26 @@ export function IndividualProductPage() {
                     alt={`Image ${currentIndex + 1} of ${product?.name}`}
                     className="w-full h-full object-contain"
                   />
+                  {hasMultipleImages && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToPreviousImage}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 rounded-full w-8 h-8 flex items-center justify-center shadow-sm transition-colors"
+                        aria-label="Previous image"
+                      >
+                        <FontAwesomeIcon icon={faChevronLeft} size="sm" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goToNextImage}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-gray-700 rounded-full w-8 h-8 flex items-center justify-center shadow-sm transition-colors"
+                        aria-label="Next image"
+                      >
+                        <FontAwesomeIcon icon={faChevronRight} size="sm" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={toggleSave}
                     className="absolute top-4 right-4 bg-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform"
@@ -224,40 +273,40 @@ export function IndividualProductPage() {
                   onSelect={(idx) => setCurrentIndex(idx)}
                 />
               )}
-              <button
-                className="mt-8 text-black font-inter text-lg px-6 py-3 rounded-lg shadow-md hover:brightness-95 transition self-start"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(135deg, #FFCD00 0%, #ffd94d 100%), url('/bg-light-white-trident.png')",
-                  backgroundBlendMode: "overlay, normal",
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "0 0, -37px -1px",
-                  backgroundSize: "100% 100%, 249px",
-                }}
-                onClick={() => navigate(backPath)}
-              >
-                &larr; Return to {from === "saved" ? "Saved Products" : "Marketplace"}
-              </button>
             </section>
 
             {/* Info Section */}
             <section className="max-w-[100%] md:max-w-[50%] flex-1 flex flex-col">
-              <h1 className="pt-2 font-jetbrains-mono text-black font-bold text-4xl break-words mb-3">
+              <h1 className="pt-2 font-jetbrains-mono text-black font-bold text-3xl break-words mb-3">
                 {product?.name}
               </h1>
-              <div className="h-px w-full bg-gray-200 mb-4" />
+              
 
-              {/* Price - Prominent Display */}
+              
               <div className="mb-6">
-                <h2 className="font-jetbrains-mono text-black text-3xl md:text-4xl font-extrabold">USD 
+                {/* Price - Prominent Display */}
+                <h2 className="font-rubik text-[#00629B] text-2xl font-extrabold">USD 
                   ${product?.price?.toFixed(2)}
                 </h2>
-                
+              <div className="h-px w-full bg-[#FFCD00] mb-4" style={{ boxShadow: "0 1px 0px rgba(0, 0, 0, 0.15)" }} /> 
+
+              {/* Description */}
+              {product?.description && (
+                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-3 min-h-[240px]" style={{ boxShadow: "3px 3px 0px rgba(0, 98, 155, .75)" }}>
+                  
+                  <p className="font-inter text-black text-base md:text-lg leading-relaxed break-words whitespace-pre-wrap">
+                    {product.description}
+                  </p>
+                </div>
+              )}
+
               </div>
+
+              
 
               {/* Product Details Grid */}
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-4 min-h-[96px] shadow-sm hover:shadow-md transition-shadow">
+                <div className="border border-gray-200 rounded-lg p-4 min-h-[96px] bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-1">
                     <FontAwesomeIcon icon={faCalendar} className="text-[#00629B] text-sm" />
                     <span className="font-inter text-gray-500 text-[11px] uppercase tracking-wide">Year</span>
@@ -265,7 +314,7 @@ export function IndividualProductPage() {
                   <p className="font-inter text-black text-base font-semibold">{product?.year}</p>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-4 min-h-[96px] shadow-sm hover:shadow-md transition-shadow">
+                <div className="border border-gray-200 rounded-lg p-4 min-h-[96px] bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-1">
                     <FontAwesomeIcon icon={faTag} className="text-[#00629B] text-sm" />
                     <span className="font-inter text-gray-500 text-[11px] uppercase tracking-wide">Category</span>
@@ -273,7 +322,7 @@ export function IndividualProductPage() {
                   <p className="font-inter text-black text-base font-semibold">{product?.category}</p>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-lg p-4 min-h-[96px] shadow-sm hover:shadow-md transition-shadow">
+                <div className="border border-gray-200 rounded-lg p-4 min-h-[96px] bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 mb-1">
                     <FontAwesomeIcon icon={faCheckCircle} className="text-[#00629B] text-sm" />
                     <span className="font-inter text-gray-500 text-[11px] uppercase tracking-wide">Condition</span>
@@ -283,54 +332,36 @@ export function IndividualProductPage() {
 
               </div>
 
-              {/* Description */}
-              {product?.description && (
-                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
-                  <h3 className="font-inter text-gray-700 text-sm uppercase tracking-wide mb-3 font-semibold">
-                    Description
-                  </h3>
-                  <p className="font-inter text-black text-base md:text-lg leading-relaxed break-words whitespace-pre-wrap">
-                    {product.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Contact Seller Box */}
-              <div className="w-full mb-6">
-                <div className="bg-gradient-to-br from-[#F5F0E6] to-[#F9F7F3] border border-gray-200 rounded-lg shadow-sm p-5 text-black font-inter">
-                  <p className="text-sm font-semibold uppercase tracking-wide mb-3">
-                    Contact Info
-                  </p>
-                  <p className="text-base leading-relaxed">
-                    <span className="font-semibold">Email:</span> {product?.userEmail ?? "placeholder"}
-                  </p>
-                  <p className="text-base leading-relaxed">
-                    <span className="font-semibold">Phone:</span> placeholder
-                  </p>
-                </div>
-              </div>
-
-              {!hasPermissions && (
-                <div
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                >
+              {/* Dynamic button section: Edit if owner, Interest Email if viewer */}
+              <div className="flex justify-center mt-8">
+                {hasPermissions ? (
                   <button
-                    onClick={!isCooling ? handleSendInterestEmail : undefined}
-                    className={`
-                      font-inter text-[#00629B]
-                      text-base md:text-xl font-light mt-6
-                      bg-white border border-[#00629B]
-                      px-4 py-2 rounded-lg
-                      transition-colors duration-200 ease-in-out
-                      ${!isCooling ? "hover:bg-blue-100" : ""}
-                      ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
-                      `}
+                    className="bg-ucsd-blue text-white font-inter text-lg md:text-xl px-8 py-3 rounded-lg hover:brightness-90 transition-all duration-200"
+                    onClick={() => navigate(`/edit-product/${id}`)}
                   >
-                    {buttonLabel}
+                    Edit Product <FontAwesomeIcon icon={faPenToSquare} />
                   </button>
-                </div>
-              )}
+                ) : (
+                  <div
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                  >
+                    <button
+                      onClick={!isCooling ? handleSendInterestEmail : undefined}
+                      className={`
+                        font-inter text-white
+                        text-lg md:text-xl px-8 py-3 rounded-lg
+                        bg-ucsd-blue
+                        transition-all duration-200 ease-in-out
+                        ${!isCooling ? "hover:brightness-90" : ""}
+                        ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
+                        `}
+                    >
+                      {buttonLabel}
+                    </button>
+                  </div>
+                )}
+              </div>
             </section>
           </div>
         )}

@@ -15,26 +15,123 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
 }).array("images", 10);
 
+const getSingleFormValue = (value: unknown) => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.find((entry): entry is string => typeof entry === "string");
+  }
+};
+
+const parsePickupLocation = (body: Record<string, unknown>) => {
+  const address = getSingleFormValue(body.pickupAddress)?.trim();
+  const placeId = getSingleFormValue(body.pickupPlaceId)?.trim();
+  const rawLat = getSingleFormValue(body.pickupLat);
+  const rawLng = getSingleFormValue(body.pickupLng);
+  const lat = rawLat === undefined ? Number.NaN : Number(rawLat);
+  const lng = rawLng === undefined ? Number.NaN : Number(rawLng);
+
+  if (!address || !placeId || Number.isNaN(lat) || Number.isNaN(lng)) {
+    return;
+  }
+
+  return {
+    address,
+    placeId,
+    lat,
+    lng,
+  };
+};
+
+const parseExistingImages = (body: Record<string, unknown>) => {
+  const existingImagesJson = getSingleFormValue(body.existingImagesJson);
+
+  if (existingImagesJson) {
+    try {
+      const parsedValue = JSON.parse(existingImagesJson);
+      if (Array.isArray(parsedValue)) {
+        return parsedValue.filter(
+          (entry): entry is string => typeof entry === "string" && entry.length > 0,
+        );
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  if (!body.existingImages) {
+    return [];
+  }
+
+  if (Array.isArray(body.existingImages)) {
+    return body.existingImages.filter(
+      (entry): entry is string => typeof entry === "string" && entry.length > 0,
+    );
+  }
+
+  if (typeof body.existingImages === "string" && body.existingImages.length > 0) {
+    return [body.existingImages];
+  }
+
+  return [];
+};
+
+type ProductFilters = {
+  isMarkedSold: { $in: Array<boolean | null> };
+  price?: {
+    $gte?: number;
+    $lte?: number;
+  };
+  condition?: string | string[];
+  tags?: {
+    $in: string[];
+  };
+};
+
+type ProductSort = Partial<Record<"price" | "timeCreated" | "condition", 1 | -1>>;
+
+const getStringQueryValue = (value: unknown) => {
+  if (typeof value === "string") {
+    return value;
+  }
+};
+
+const getStringArrayQueryValue = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string");
+  }
+};
+
 /**
  * get all the products in database (keep filters, sorting in mind)
  */
 export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { sortBy, order, minPrice, maxPrice, condition, tags } = req.query;
+    const sortByValue = getStringQueryValue(sortBy);
+    const orderValue = getStringQueryValue(order);
+    const minPriceValue = getStringQueryValue(minPrice);
+    const maxPriceValue = getStringQueryValue(maxPrice);
+    const conditionValue = getStringQueryValue(condition);
+    const tagArrayValue = getStringArrayQueryValue(tags);
 
     // object containing different filters we can apply
-    const filters: any = {};
+    const filters: ProductFilters = {
+      isMarkedSold: { $in: [false, null] },
+    };
 
     // Check for filters and add them to object
-    if (minPrice || maxPrice) {
+    if (minPriceValue || maxPriceValue) {
       filters.price = {};
-      if (minPrice) filters.price.$gte = Number(minPrice);
-      if (maxPrice) filters.price.$lte = Number(maxPrice);
+      if (minPriceValue) filters.price.$gte = Number(minPriceValue);
+      if (maxPriceValue) filters.price.$lte = Number(maxPriceValue);
     }
 
     // Filter by specific condition
-    if (condition) {
-      filters.condition = condition;
+    if (conditionValue) {
+      filters.condition = conditionValue;
     }
 
     // Filter by category
@@ -42,9 +139,9 @@ export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
       // Handle both single tag and multiple tags
       let tagArray: string[];
 
-      if (Array.isArray(tags)) {
+      if (tagArrayValue) {
         // Already an array: ?tags=Electronics&tags=Furniture
-        tagArray = tags as string[];
+        tagArray = tagArrayValue;
       } else if (typeof tags === "string") {
         // Single string, could be comma-separated: ?tags=Electronics,Furniture
         tagArray = tags.includes(",") ? tags.split(",").map((t) => t.trim()) : [tags];
@@ -58,12 +155,12 @@ export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // sort object for different sorting options
-    const sortTypes: any = {};
+    const sortTypes: ProductSort = {};
 
-    if (sortBy) {
-      const sortOrder = order === "asc" ? 1 : -1;
+    if (sortByValue) {
+      const sortOrder = orderValue === "asc" ? 1 : -1;
 
-      switch (sortBy) {
+      switch (sortByValue) {
         case "price":
           sortTypes.price = sortOrder;
           break;
@@ -134,7 +231,8 @@ export const addProduct = [
   upload,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { name, price, description, category, condition } = req.body;
+      const { name, price, description, category, condition, year } = req.body;
+      const pickupLocation = parsePickupLocation(req.body as Record<string, unknown>);
       if (!req.user) return res.status(404).json({ message: "User not found" });
       const userId = req.user._id;
       const userEmail = req.user.userEmail;
@@ -168,10 +266,13 @@ export const addProduct = [
         name,
         price,
         description,
+        year: year ? Number(year) : undefined,
+        category: category || undefined,
         userEmail,
         images,
         condition,
         tags,
+        pickupLocation,
         timeCreated: new Date(),
         timeUpdated: new Date(),
       });
@@ -245,8 +346,8 @@ export const updateProductById = [
         tags = [req.body.category];
       }
 
-      let existing = req.body.existingImages || [];
-      if (!Array.isArray(existing)) existing = [existing];
+      const existingImages = parseExistingImages(req.body as Record<string, unknown>);
+      const pickupLocation = parsePickupLocation(req.body as Record<string, unknown>);
 
       const newUrls: string[] = [];
       const app = initializeApp(firebaseConfig);
@@ -258,20 +359,47 @@ export const updateProductById = [
         newUrls.push(await getDownloadURL(ref(storage, name)));
       }
 
-      const finalImages = [...existing, ...newUrls];
+      const finalImages = [...existingImages, ...newUrls];
 
-      const updateData: any = {
-        name: req.body.name,
-        price: req.body.price,
-        description: req.body.description,
-        condition: req.body.condition,
+      const updateData: Record<string, unknown> = {
         images: finalImages,
         timeUpdated: new Date(),
-        isMarkedSold: req.body.isMarkedSold ?? false,
       };
+
+      const name = getSingleFormValue(req.body.name);
+      if (name !== undefined) {
+        updateData.name = name;
+      }
+
+      const price = getSingleFormValue(req.body.price);
+      if (price !== undefined) {
+        const parsedPrice = Number(price);
+        if (!Number.isNaN(parsedPrice)) {
+          updateData.price = parsedPrice;
+        }
+      }
+
+      const description = getSingleFormValue(req.body.description);
+      if (description !== undefined) {
+        updateData.description = description;
+      }
+
+      const condition = getSingleFormValue(req.body.condition);
+      if (condition !== undefined) {
+        updateData.condition = condition;
+      }
 
       if (tags) {
         updateData.tags = tags;
+      }
+
+      const isMarkedSold = getSingleFormValue(req.body.isMarkedSold);
+      if (isMarkedSold !== undefined) {
+        updateData.isMarkedSold = isMarkedSold === "true";
+      }
+
+      if (pickupLocation) {
+        updateData.pickupLocation = pickupLocation;
       }
 
       const updatedProduct = await ProductModel.findByIdAndUpdate(id, updateData, { new: true });
@@ -284,10 +412,12 @@ export const updateProductById = [
         message: "Product successfully updated",
         updatedProduct,
       });
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
       return res.status(500).json({
         message: "Error patching product",
-        error: err.message || err.toString(),
+        error: errorMessage,
       });
     }
   },

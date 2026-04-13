@@ -21,7 +21,7 @@ export const toggleSavedProduct = async (req: Request, res: Response) => {
 
     res.status(200).json({
       message: "Saved products updated",
-      savedProducts: user.savedProducts
+      savedProducts: user.savedProducts,
     });
   } catch (error) {
     console.error("Error toggling saved product:", error);

@@ -1,4 +1,5 @@
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
+import { googleMapsApiKey, googleMapsLibraries, googleMapsScriptId } from "src/utils/googleMaps";
 
 type ListingMapProps = {
   center: { lat: number; lng: number };
@@ -7,7 +8,6 @@ type ListingMapProps = {
   className?: string;
 };
 
-const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const mapContainerStyle = {
   width: "100%",
   height: "100%",
@@ -40,36 +40,11 @@ function MapFallback({
   );
 }
 
-export default function ListingMap({
-  center,
-  markerTitle,
-  label,
-  className = "",
-}: ListingMapProps) {
-  if (!googleMapsApiKey) {
-    return (
-      <MapFallback
-        className={className}
-        label={label}
-        message="Add VITE_GOOGLE_MAPS_API_KEY to view the interactive map for this pickup area."
-      />
-    );
-  }
-
-  return (
-    <LoadedListingMap
-      center={center}
-      className={className}
-      label={label}
-      markerTitle={markerTitle}
-    />
-  );
-}
-
 function LoadedListingMap({ center, markerTitle, label, className = "" }: ListingMapProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey,
-    id: "listing-map-script",
+    id: googleMapsScriptId,
+    libraries: googleMapsLibraries,
   });
 
   if (loadError) {
@@ -77,7 +52,7 @@ function LoadedListingMap({ center, markerTitle, label, className = "" }: Listin
       <MapFallback
         className={className}
         label={label}
-        message="The map could not be loaded right now. The pickup area is currently set to UCSD Price Center."
+        message={`The map could not be loaded right now. The pickup area is currently set to ${label}.`}
       />
     );
   }
@@ -104,5 +79,31 @@ function LoadedListingMap({ center, markerTitle, label, className = "" }: Listin
         <MarkerF position={center} title={markerTitle} />
       </GoogleMap>
     </div>
+  );
+}
+
+export default function ListingMap({
+  center,
+  markerTitle,
+  label,
+  className = "",
+}: ListingMapProps) {
+  if (!googleMapsApiKey) {
+    return (
+      <MapFallback
+        className={className}
+        label={label}
+        message="Add VITE_GOOGLE_MAPS_API_KEY to view the interactive map for this pickup area."
+      />
+    );
+  }
+
+  return (
+    <LoadedListingMap
+      center={center}
+      className={className}
+      label={label}
+      markerTitle={markerTitle}
+    />
   );
 }

@@ -1,8 +1,12 @@
 import { FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate, useParams } from "react-router-dom";
+
 import { DELETE, get, patch } from "src/api/requests";
+import PickupLocationField from "src/components/PickupLocationField";
 import { FirebaseContext } from "src/utils/FirebaseProvider";
+import { hasGoogleMapsApiKey } from "src/utils/googleMaps";
+import type { PickupLocation } from "src/utils/pickupLocation";
 
 export function EditProduct() {
   const { id } = useParams();
@@ -18,6 +22,7 @@ export function EditProduct() {
     year: number;
     category: string;
     condition: string;
+    pickupLocation?: PickupLocation;
   }>();
 
   const productName = useRef<HTMLInputElement>(null);
@@ -32,18 +37,22 @@ export function EditProduct() {
   const years = Array.from({ length: currentYear - 1950 }, (_, i) => currentYear - i);
 
   const categories = [
-  'Electronics',
-  'School Supplies',
-  'Dorm Essentials',
-  'Furniture',
-  'Clothes',
-  'Miscellaneous'];
+    "Electronics",
+    "School Supplies",
+    "Dorm Essentials",
+    "Furniture",
+    "Clothes",
+    "Miscellaneous",
+  ];
 
   const conditions = ["New", "Used"];
 
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [newPreviews, setNewPreviews] = useState<string[]>([]);
+  const [pickupLocation, setPickupLocation] = useState<PickupLocation | null>(null);
+  const [pickupLocationError, setPickupLocationError] = useState<string | null>(null);
+  const [hasPendingPickupSelection, setHasPendingPickupSelection] = useState(false);
 
   const [error, setError] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -57,6 +66,7 @@ export function EditProduct() {
       .then((data) => {
         setProduct(data);
         setExistingImages(data.images);
+        setPickupLocation(data.pickupLocation ?? null);
       })
       .catch(() => setError(true));
   }, [id]);
@@ -107,6 +117,11 @@ export function EditProduct() {
         productCondition.current &&
         user
       ) {
+        if (hasGoogleMapsApiKey && hasPendingPickupSelection) {
+          setPickupLocationError("Select a Google suggestion or clear the pickup address field.");
+          return;
+        }
+
         const body = new FormData();
         body.append("name", productName.current.value);
         body.append("price", productPrice.current.value);
@@ -116,11 +131,16 @@ export function EditProduct() {
         body.append("condition", productCondition.current.value);
         body.append("userEmail", user.email || "");
         body.append("isMarkedSold", String(product?.isMarkedSold));
+        body.append("existingImagesJson", JSON.stringify(existingImages));
 
-        // append existing image URLs
-        existingImages.forEach((url) => body.append("existingImages", url));
-        // append new File objects
         newFiles.forEach((file) => body.append("images", file));
+
+        if (pickupLocation) {
+          body.append("pickupAddress", pickupLocation.address);
+          body.append("pickupPlaceId", pickupLocation.placeId);
+          body.append("pickupLat", pickupLocation.lat.toString());
+          body.append("pickupLng", pickupLocation.lng.toString());
+        }
 
         const res = await patch(`/api/products/${id}`, body);
 
@@ -168,7 +188,11 @@ export function EditProduct() {
             <div className="inline-flex flex-wrap justify-start gap-2">
               {existingImages.map((url) => (
                 <div key={url} className="relative m-1 w-24 h-24">
-                  <img src={url} className="w-full h-full object-cover rounded-md" />
+                  <img
+                    src={url}
+                    alt="Existing product preview"
+                    className="w-full h-full object-cover rounded-md"
+                  />
                   <button
                     type="button"
                     onClick={() => removeExisting(url)}
@@ -181,7 +205,11 @@ export function EditProduct() {
 
               {newPreviews.map((src, idx) => (
                 <div key={src} className="relative m-1 w-24 h-24">
-                  <img src={src} className="w-full h-full object-cover rounded-md" />
+                  <img
+                    src={src}
+                    alt={`New product preview ${idx + 1}`}
+                    className="w-full h-full object-cover rounded-md"
+                  />
                   <button
                     type="button"
                     onClick={() => removeNew(idx)}
@@ -198,6 +226,7 @@ export function EditProduct() {
             htmlFor="productImages"
             className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
           >
+            <span className="sr-only">Upload product images</span>
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
               <svg
                 className="w-10 h-10 mb-3 text-gray-400"
@@ -217,19 +246,19 @@ export function EditProduct() {
               </p>
               <p className="text-xs text-gray-500">PNG or JPG (MAX. 5MB per image)</p>
             </div>
-          <input
-            name="images"
-            id="productImages"
-            type="file"
-            multiple
-            accept="image/png, image/jpeg"
-            onChange={handleImageChange}
-            ref={productImages}
-            className="hidden"
-          />
-        </label>
+            <input
+              name="images"
+              id="productImages"
+              type="file"
+              multiple
+              accept="image/png, image/jpeg"
+              onChange={handleImageChange}
+              ref={productImages}
+              className="hidden"
+            />
+          </label>
         </div>
-        
+
         <div className="mb-5">
           <label htmlFor="productName" className="block mb-2 font-medium font-inter text-black">
             Name
@@ -323,7 +352,10 @@ export function EditProduct() {
         </div>
 
         <div className="mb-5">
-          <label htmlFor="productCondition" className="block mb-2 font-medium font-inter text-black">
+          <label
+            htmlFor="productCondition"
+            className="block mb-2 font-medium font-inter text-black"
+          >
             Condition
           </label>
           <select
@@ -342,6 +374,21 @@ export function EditProduct() {
             ))}
           </select>
         </div>
+
+        <PickupLocationField
+          value={pickupLocation}
+          error={pickupLocationError}
+          onChange={(nextValue) => {
+            setPickupLocation(nextValue);
+            setPickupLocationError(null);
+          }}
+          onSelectionStatusChange={(hasPendingSelection) => {
+            setHasPendingPickupSelection(hasPendingSelection);
+            if (!hasPendingSelection) {
+              setPickupLocationError(null);
+            }
+          }}
+        />
 
         <div className="flex justify-between gap-3">
           <button

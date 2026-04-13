@@ -7,6 +7,7 @@ import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { get, patch, post } from "src/api/requests";
 import { FirebaseContext } from "src/utils/FirebaseProvider";
+import type { PickupLocation } from "src/utils/pickupLocation";
 import EmblaCarousel from "src/components/EmblaCarousel";
 import { EmblaOptionsType } from "embla-carousel";
 
@@ -28,6 +29,7 @@ export function IndividualProductPage() {
     description: string;
     isMarkedSold: boolean;
     tags: string[];
+    pickupLocation?: PickupLocation;
   }>();
   const [error, setError] = useState<string>();
   const [hasPermissions, setHasPermissions] = useState<boolean>(false);
@@ -138,7 +140,7 @@ export function IndividualProductPage() {
     body.append("price", product.price.toString());
     body.append("description", product.description);
     body.append("userEmail", product.userEmail);
-    product.images.forEach((url) => body.append("existingImages", url));
+    body.append("existingImagesJson", JSON.stringify(product.images));
     body.append("isMarkedSold", String(!product.isMarkedSold));
 
     await patch(`/api/products/${id}`, body)
@@ -163,10 +165,10 @@ export function IndividualProductPage() {
   const totalMinutes = Math.ceil(msLeft / (1000 * 60)); // convert ms → minutes
   const hoursLeft = Math.floor(totalMinutes / 60);
   const minutesLeft = totalMinutes % 60;
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   useEffect(() => {
     if (!isCooling) return;
-    const iv = setInterval(() => setTick((t) => t + 1), 60_000); // 60 000 ms = 1 min
+    const iv = setInterval(() => setTick((t) => t + 1), 60_000); // 60,000 ms = 1 min
     return () => clearInterval(iv);
   }, [isCooling]);
   let buttonLabel = "Interested?";
@@ -196,10 +198,16 @@ export function IndividualProductPage() {
       const userRes = await get(`/api/users/${user.uid}`);
       const userData = await userRes.json();
       setIsSaved(userData.savedProducts.includes(id));
-    } catch (error) {
-      console.error("Error saving product:", error);
+    } catch (caughtError) {
+      console.error("Error saving product:", caughtError);
     }
   };
+
+  const pickupLocation = product?.pickupLocation;
+  const pickupMapCenter = pickupLocation
+    ? { lat: pickupLocation.lat, lng: pickupLocation.lng }
+    : priceCenterCoordinates;
+  const pickupAddressLabel = pickupLocation?.address ?? "UCSD Price Center";
 
   return (
     <>
@@ -238,7 +246,7 @@ export function IndividualProductPage() {
                       ? product.images[currentIndex]
                       : "/productImages/product-placeholder.webp"
                   }
-                  alt={`Image ${currentIndex + 1} of ${product?.name}`}
+                  alt={`${product?.name} preview ${currentIndex + 1}`}
                   className="w-full h-full object-contain"
                 />
                 <button
@@ -320,8 +328,8 @@ export function IndividualProductPage() {
               <section className="mt-4">
                 <h2 className="font-inter text-lg font-semibold text-[#182B49]">Pickup Location</h2>
                 <p className="mt-2 font-inter text-sm leading-6 text-[#4B5563]">
-                  This is a temporary shared pickup-location placeholder until listing-specific
-                  locations are connected to the backend.
+                  {pickupLocation?.address ??
+                    "Older listings still default to UCSD Price Center until a pickup address is added."}
                 </p>
                 <Suspense
                   fallback={
@@ -332,33 +340,30 @@ export function IndividualProductPage() {
                   }
                 >
                   <ListingMap
-                    center={priceCenterCoordinates}
+                    center={pickupMapCenter}
                     className="mt-4"
-                    label="UCSD Price Center"
-                    markerTitle="Pickup location"
+                    label={pickupAddressLabel}
+                    markerTitle={pickupAddressLabel}
                   />
                 </Suspense>
               </section>
               {!hasPermissions && (
-                <div
+                <button
+                  onClick={!isCooling ? handleSendInterestEmail : undefined}
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
+                  className={`
+                    font-inter text-[#00629B]
+                    text-base md:text-xl font-light mt-6
+                    bg-white border border-[#00629B]
+                    px-4 py-2 rounded-lg
+                    transition-colors duration-200 ease-in-out
+                    ${!isCooling ? "hover:bg-blue-100" : ""}
+                    ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
                 >
-                  <button
-                    onClick={!isCooling ? handleSendInterestEmail : undefined}
-                    className={`
-                      font-inter text-[#00629B]
-                      text-base md:text-xl font-light mt-6
-                      bg-white border border-[#00629B]
-                      px-4 py-2 rounded-lg
-                      transition-colors duration-200 ease-in-out
-                      ${!isCooling ? "hover:bg-blue-100" : ""}
-                      ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
-                      `}
-                  >
-                    {buttonLabel}
-                  </button>
-                </div>
+                  {buttonLabel}
+                </button>
               )}
             </section>
           </div>

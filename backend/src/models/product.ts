@@ -1,5 +1,29 @@
 import { HydratedDocument, InferSchemaType, Schema, model } from "mongoose";
 
+const pickupLocationSchema = new Schema(
+  {
+    address: {
+      type: String,
+      required: true,
+    },
+    placeId: {
+      type: String,
+      required: true,
+    },
+    lat: {
+      type: Number,
+      required: true,
+    },
+    lng: {
+      type: Number,
+      required: true,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const productSchema = new Schema({
   name: {
     type: String,
@@ -48,6 +72,10 @@ const productSchema = new Schema({
     required: true,
   },
   images: [{ type: String }],
+  pickupLocation: {
+    type: pickupLocationSchema,
+    required: false,
+  },
 });
 
 export type Product = HydratedDocument<InferSchemaType<typeof productSchema>>;

@@ -1,15 +1,20 @@
-import { faPenToSquare, faCheck, faArrowUp } from "@fortawesome/free-solid-svg-icons";
-import { faHeart as faHeartSolid } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
+import {
+  faArrowUp,
+  faCheck,
+  faHeart as faHeartSolid,
+  faPenToSquare,
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { EmblaOptionsType } from "embla-carousel";
 import { Suspense, lazy, useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { get, patch, post } from "src/api/requests";
-import { FirebaseContext } from "src/utils/FirebaseProvider";
-import type { PickupLocation } from "src/utils/pickupLocation";
 import EmblaCarousel from "src/components/EmblaCarousel";
-import { EmblaOptionsType } from "embla-carousel";
+import { FirebaseContext } from "src/utils/FirebaseProvider";
+
+import type { PickupLocation } from "src/utils/pickupLocation";
 
 const ListingMap = lazy(() => import("src/components/ListingMap"));
 const priceCenterCoordinates = {
@@ -344,6 +349,7 @@ export function IndividualProductPage() {
                     className="mt-4"
                     label={pickupAddressLabel}
                     markerTitle={pickupAddressLabel}
+                    placeId={pickupLocation?.placeId}
                   />
                 </Suspense>
               </section>

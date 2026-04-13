@@ -1,6 +1,5 @@
 import { Autocomplete, useJsApiLoader } from "@react-google-maps/api";
 import { useEffect, useId, useState } from "react";
-
 import ListingMap from "src/components/ListingMap";
 import {
   googleMapsApiKey,
@@ -8,6 +7,7 @@ import {
   googleMapsScriptId,
   hasGoogleMapsApiKey,
 } from "src/utils/googleMaps";
+
 import type { PickupLocation } from "src/utils/pickupLocation";
 
 type PickupLocationFieldProps = {
@@ -167,6 +167,7 @@ function LoadedPickupLocationField({
             className="mt-0"
             label="Pickup preview"
             markerTitle={value.address}
+            placeId={value.placeId}
           />
         </div>
       )}

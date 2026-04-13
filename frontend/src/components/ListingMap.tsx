@@ -1,8 +1,10 @@
 import { GoogleMap, MarkerF, useJsApiLoader } from "@react-google-maps/api";
+import { useEffect, useState } from "react";
 import { googleMapsApiKey, googleMapsLibraries, googleMapsScriptId } from "src/utils/googleMaps";
 
 type ListingMapProps = {
   center: { lat: number; lng: number };
+  placeId?: string;
   markerTitle: string;
   label: string;
   className?: string;
@@ -20,6 +22,33 @@ const mapOptions = {
   streetViewControl: false,
   zoomControl: true,
 };
+const fallbackZoom = 16;
+const maxViewportZoom = 17;
+const viewportPadding = 48;
+const placeViewportCache = new Map<string, google.maps.LatLngBoundsLiteral>();
+
+function applyFallbackView(map: google.maps.Map, center: google.maps.LatLngLiteral) {
+  map.panTo(center);
+  map.setZoom(fallbackZoom);
+}
+
+function clampViewportZoom(map: google.maps.Map) {
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    const currentZoom = map.getZoom();
+
+    if (typeof currentZoom === "number" && currentZoom > maxViewportZoom) {
+      map.setZoom(maxViewportZoom);
+    }
+  });
+}
+
+function applyViewport(
+  map: google.maps.Map,
+  viewport: google.maps.LatLngBounds | google.maps.LatLngBoundsLiteral,
+) {
+  map.fitBounds(viewport, viewportPadding);
+  clampViewportZoom(map);
+}
 
 function MapFallback({
   className = "",
@@ -40,12 +69,65 @@ function MapFallback({
   );
 }
 
-function LoadedListingMap({ center, markerTitle, label, className = "" }: ListingMapProps) {
+function LoadedListingMap({
+  center,
+  placeId,
+  markerTitle,
+  label,
+  className = "",
+}: ListingMapProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey,
     id: googleMapsScriptId,
     libraries: googleMapsLibraries,
   });
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    if (!placeId) {
+      applyFallbackView(map, center);
+      return;
+    }
+
+    const cachedViewport = placeViewportCache.get(placeId);
+    if (cachedViewport) {
+      applyViewport(map, cachedViewport);
+      return;
+    }
+
+    let isCancelled = false;
+    const placesService = new google.maps.places.PlacesService(map);
+
+    placesService.getDetails(
+      {
+        placeId,
+        fields: ["geometry.viewport"],
+      },
+      (place, status) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const viewport = place?.geometry?.viewport;
+        if (status === google.maps.places.PlacesServiceStatus.OK && viewport) {
+          const viewportLiteral = viewport.toJSON();
+          placeViewportCache.set(placeId, viewportLiteral);
+          applyViewport(map, viewportLiteral);
+          return;
+        }
+
+        applyFallbackView(map, center);
+      },
+    );
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [center.lat, center.lng, map, placeId]);
 
   if (loadError) {
     return (
@@ -73,8 +155,10 @@ function LoadedListingMap({ center, markerTitle, label, className = "" }: Listin
       <GoogleMap
         center={center}
         mapContainerStyle={mapContainerStyle}
+        onLoad={setMap}
+        onUnmount={() => setMap(null)}
         options={mapOptions}
-        zoom={16}
+        zoom={fallbackZoom}
       >
         <MarkerF position={center} title={markerTitle} />
       </GoogleMap>
@@ -84,6 +168,7 @@ function LoadedListingMap({ center, markerTitle, label, className = "" }: Listin
 
 export default function ListingMap({
   center,
+  placeId,
   markerTitle,
   label,
   className = "",
@@ -104,6 +189,7 @@ export default function ListingMap({
       className={className}
       label={label}
       markerTitle={markerTitle}
+      placeId={placeId}
     />
   );
 }

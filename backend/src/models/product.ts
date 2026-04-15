@@ -29,10 +29,18 @@ const productSchema = new Schema({
     type: Boolean,
     required: true,
     default: false,
+  },
   tags: {
-    type: [String], 
-    enum: ['Electronics', 'School Supplies', 'Dorm Essentials', 'Furniture', 'Clothes', 'Miscellaneous'], 
-    required: false
+    type: [String],
+    enum: [
+      "Electronics",
+      "School Supplies",
+      "Dorm Essentials",
+      "Furniture",
+      "Clothes",
+      "Miscellaneous",
+    ],
+    required: false,
   },
   condition: {
     type: String,

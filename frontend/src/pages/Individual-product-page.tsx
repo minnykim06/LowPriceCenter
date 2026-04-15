@@ -1,18 +1,24 @@
-import { faPenToSquare, faCheck, faArrowUp } from "@fortawesome/free-solid-svg-icons";
-import { faHeart as faHeartSolid } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
+import {
+  faArrowUp,
+  faCheck,
+  faHeart as faHeartSolid,
+  faPenToSquare,
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { EmblaOptionsType } from "embla-carousel";
 import { useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { get, patch, post } from "src/api/requests";
-import { FirebaseContext } from "src/utils/FirebaseProvider";
 import EmblaCarousel from "src/components/EmblaCarousel";
-import { EmblaOptionsType } from "embla-carousel";
+import { ChatContext } from "src/utils/ChatProvider";
+import { FirebaseContext } from "src/utils/FirebaseProvider";
 
 export function IndividualProductPage() {
   const navigate = useNavigate();
   const { user } = useContext(FirebaseContext);
+  const { fetchConversations, joinConversation } = useContext(ChatContext);
   const { id } = useParams();
   const [product, setProduct] = useState<{
     name: string;
@@ -125,6 +131,20 @@ export function IndividualProductPage() {
     }
   };
 
+  const handleSendSellerMessage = async () => {
+    const receiver = product?.userEmail;
+    if (!receiver) return;
+    try {
+      const res = await post("/api/conversations", { participantEmails: [receiver] });
+      const data = await res.json();
+      fetchConversations();
+      joinConversation(data._id);
+
+      navigate("/messages");
+    } catch (err) {
+      console.log(err);
+    }
+  };
   const handleMarkSold = async () => {
     if (!product) return;
     const body = new FormData();
@@ -312,13 +332,14 @@ export function IndividualProductPage() {
                 </div>
               )}
               {!hasPermissions && (
-                <div
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                >
-                  <button
-                    onClick={!isCooling ? handleSendInterestEmail : undefined}
-                    className={`
+                <div className="flex flex-col gap-2 ">
+                  <div
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                  >
+                    <button
+                      onClick={!isCooling ? handleSendInterestEmail : undefined}
+                      className={`
                       font-inter text-[#00629B]
                       text-base md:text-xl font-light mt-6
                       bg-white border border-[#00629B]
@@ -327,8 +348,21 @@ export function IndividualProductPage() {
                       ${!isCooling ? "hover:bg-blue-100" : ""}
                       ${isCooling ? "opacity-50 cursor-not-allowed" : ""}
                       `}
+                    >
+                      {buttonLabel}
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleSendSellerMessage}
+                    className={`font-inter text-[#00629B]
+                      text-base md:text-xl font-light mt-6
+                      bg-white border border-[#00629B]
+                      px-4 py-2 rounded-lg
+                      transition-colors duration-200 ease-in-out
+                      hover:bg-blue-100
+                      `}
                   >
-                    {buttonLabel}
+                    Send a message?
                   </button>
                 </div>
               )}

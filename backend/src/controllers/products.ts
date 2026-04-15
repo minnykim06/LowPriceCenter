@@ -20,38 +20,34 @@ const upload = multer({
  */
 export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const products = await ProductModel.find({ isMarkedSold: { $in: [false, null] } });
     const { sortBy, order, minPrice, maxPrice, condition, tags } = req.query;
 
     // object containing different filters we can apply
-    const filters: any = {}; 
-  
+    const filters: any = {};
+
     // Check for filters and add them to object
-    if(minPrice || maxPrice) {
+    if (minPrice || maxPrice) {
       filters.price = {};
-      if(minPrice) filters.price.$gte = Number(minPrice);
-      if(maxPrice) filters.price.$lte = Number(maxPrice);
+      if (minPrice) filters.price.$gte = Number(minPrice);
+      if (maxPrice) filters.price.$lte = Number(maxPrice);
     }
 
     // Filter by specific condition
-    if(condition) {
+    if (condition) {
       filters.condition = condition;
     }
 
     // Filter by category
-    if(tags) {
+    if (tags) {
       // Handle both single tag and multiple tags
       let tagArray: string[];
-      
-      if (Array.isArray(tags)) {
 
+      if (Array.isArray(tags)) {
         // Already an array: ?tags=Electronics&tags=Furniture
         tagArray = tags as string[];
-      } else if (typeof tags === 'string') {
-
+      } else if (typeof tags === "string") {
         // Single string, could be comma-separated: ?tags=Electronics,Furniture
-        tagArray = tags.includes(',') ? tags.split(',').map(t => t.trim()) : [tags];
-      
+        tagArray = tags.includes(",") ? tags.split(",").map((t) => t.trim()) : [tags];
       } else {
         tagArray = [];
       }
@@ -62,12 +58,12 @@ export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // sort object for different sorting options
-    const sortTypes: any = {}
+    const sortTypes: any = {};
 
-    if(sortBy) {
+    if (sortBy) {
       const sortOrder = order === "asc" ? 1 : -1;
-      
-      switch(sortBy) {
+
+      switch (sortBy) {
         case "price":
           sortTypes.price = sortOrder;
           break;
@@ -143,9 +139,11 @@ export const addProduct = [
       const userId = req.user._id;
       const userEmail = req.user.userEmail;
       if (!name || !price || !userEmail || !condition) {
-        return res.status(400).json({ message: "Name, price, userEmail, and condition are required." });
+        return res
+          .status(400)
+          .json({ message: "Name, price, userEmail, and condition are required." });
       }
-      
+
       const tags = category ? [category] : [];
 
       const images: string[] = [];
@@ -269,25 +267,14 @@ export const updateProductById = [
         condition: req.body.condition,
         images: finalImages,
         timeUpdated: new Date(),
+        isMarkedSold: req.body.isMarkedSold ?? false,
       };
 
       if (tags) {
         updateData.tags = tags;
       }
 
-      const updatedProduct = await ProductModel.findByIdAndUpdate(
-        id,
-        {
-          name: req.body.name,
-          price: req.body.price,
-          description: req.body.description,
-          images: finalImages,
-          timeUpdated: new Date(),
-          isMarkedSold: req.body.isMarkedSold ?? false,
-        },
-        updateData,
-        { new: true },
-      );
+      const updatedProduct = await ProductModel.findByIdAndUpdate(id, updateData, { new: true });
 
       if (!updatedProduct) {
         return res.status(404).json({ message: "Product not found" });

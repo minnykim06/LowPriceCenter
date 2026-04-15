@@ -14,15 +14,9 @@ export default {
         "ucsd-blue": "#0E7395",
         "ucsd-darkblue": "#182B49",
         "ucsd-gold": "#FFCD00",
-        // Figma palette
-        "figma-sand": "#F9D488",
-        "figma-orange": "#F4A71D",
-        "figma-mint": "#53DCCE",
-        "figma-teal": "#0E6F8F",
-        "figma-charcoal": "#222222",
-        // Figma mockup uses different gold
-        // "ucsd-gold": "#FFCD00",
-        "ucsd-gold": "#F6AE2D",
+        "default-bg": "#FFFFFF",
+        "default-teal": "#57DBCE",
+        "default-gray": "#D9D9D9",
       },
       fontFamily: {
         jetbrains: ["JetBrains Mono", "monospace"],

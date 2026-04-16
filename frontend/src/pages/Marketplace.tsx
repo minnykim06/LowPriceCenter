@@ -1,8 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { get, post } from "src/api/requests";
-import { Header } from "src/components/Header";
-import { useNavigate } from "react-router-dom";
 import Product from "src/components/Product";
 import SearchBar from "src/components/SearchBar";
 import FilterSort from "src/components/FilterSort";
@@ -18,7 +16,6 @@ interface FilterState {
 }
 
 export function Marketplace() {
-  const navigate = useNavigate();
   const [products, setProducts] = useState<
     Array<{
       _id: string;
@@ -109,11 +106,10 @@ export function Marketplace() {
 
   return (
     <>
-      <Header />
       <Helmet>
         <title>Low-Price Center</title>
       </Helmet>
-        
+
       <div className="w-full h-64 overflow-hidden">
         <img
           src="/ucsd-pricecenter.png"

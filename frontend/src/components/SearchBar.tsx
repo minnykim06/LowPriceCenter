@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { get } from "src/api/requests";
 
 interface Props {
   setProducts: (query: string) => void;
   setError: (error: string) => void;
 }
 
-export default function SearchBar({ setProducts, setError }: Props) {
+export default function SearchBar({ setProducts, setError: _setError }: Props) {
   const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState<string | null>(searchParams.get("query") || "");
+  const [, setQuery] = useState<string | null>(searchParams.get("query") || "");
 
   const handleChange = (value: string) => {
     setQuery(value);

@@ -1,6 +1,6 @@
 import { FirebaseApp, initializeApp } from "firebase/app";
 import { GoogleAuthProvider, User, getAuth, signInWithPopup, signOut } from "firebase/auth";
-import { MouseEventHandler, ReactNode, createContext, useEffect, useState } from "react";
+import { ReactNode, createContext, useEffect, useState } from "react";
 import { get, post } from "src/api/requests";
 
 import { firebaseConfig } from "src/utils/FirebaseConfig";
@@ -12,8 +12,8 @@ const FirebaseContext = createContext<{
   app: FirebaseApp | undefined;
   user: User | null;
   loading: boolean;
-  openGoogleAuthentication: MouseEventHandler<HTMLButtonElement>;
-  signOutFromFirebase: MouseEventHandler<HTMLButtonElement>;
+  openGoogleAuthentication: () => void;
+  signOutFromFirebase: () => void;
 }>({
   app: undefined,
   user: null,

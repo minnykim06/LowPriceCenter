@@ -50,7 +50,7 @@ export default function ChatProvider({ children }: { children: ReactNode }) {
   const fetchConversations = async () => {
     const res = await get(`/api/conversations`);
     const convos = await res.json();
-    const sortedConvos = convos.sort((a, b) => {
+    const sortedConvos = (convos as Conversation[]).sort((a, b) => {
       const aCreated = a.lastMessage ? a.lastMessage.createdAt : a.createdAt;
       const bCreated = b.lastMessage ? b.lastMessage.createdAt : b.createdAt;
       return compareDate(aCreated, bCreated);

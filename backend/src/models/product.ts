@@ -45,10 +45,6 @@ const productSchema = new Schema({
     type: String,
     required: true,
   },
-  condition: {
-    type: String,
-    required: true,
-  },
   timeCreated: {
     type: Date,
     required: true,

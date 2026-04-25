@@ -241,7 +241,7 @@ export function IndividualProductPage() {
       <Helmet>
         <title>{`${product?.name} - Low-Price Center`}</title>
       </Helmet>
-      <main className="w-[80%] max-w-screen-2xl mx-auto m-12">
+      <main className="w-[80%] max-w-screen-2xl mx-auto mt-24 mb-12">
         <div className="flex justify-between">
           <button
             className="text-lg mb-4 font-inter hover:underline"

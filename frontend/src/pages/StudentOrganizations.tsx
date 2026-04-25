@@ -101,7 +101,7 @@ export function StudentOrganizations() {
       <Helmet>
         <title>Student Organizations - Low-Price Center</title>
       </Helmet>
-      <main className="w-full flex justify-center items-center mt-12 mb-20">
+      <main className="w-full flex justify-center items-center mt-24 mb-20">
         <div className="max-w-[90%] w-full">
           <div className="mb-6">
             <h1 className="text-3xl font-jetbrains font-medium mb-2">Student Organizations</h1>

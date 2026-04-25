@@ -7,7 +7,7 @@ import { AuthenticatedRequest } from "src/validators/authUserMiddleware";
  * Both lists apply: add long-lived defaults here and/or set STUDENT_ORG_ALLOWED_EMAILS in .env.
  */
 const ALLOWED_ORGANIZATION_EMAILS: string[] = [
-  // "mik127@ucsd.edu",
+  "sjammula@ucsd.edu",
 ];
 
 function allowedEmailsSet(): Set<string> {

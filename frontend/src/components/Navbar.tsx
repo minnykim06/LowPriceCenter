@@ -25,8 +25,16 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { HTMLAttributes, forwardRef, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+<<<<<<< Updated upstream
 >>>>>>> upstream/dev
+=======
+import { DELETE } from "src/api/requests";
+>>>>>>> Stashed changes
 import { FirebaseContext } from "src/utils/FirebaseProvider";
+import { STUDENT_ORG_CHANGED_EVENT } from "src/utils/studentOrgEvents";
+import { getToken } from "src/utils/User";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface MiniSearchbarProps extends HTMLAttributes<HTMLDivElement> {
   open: boolean;
@@ -90,11 +98,96 @@ export function Navbar() {
   }, [user]);
 =======
   const [isSearchBarOpen, setSearchbarOpen] = useState<boolean>(false);
+<<<<<<< Updated upstream
+=======
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [studentOrgCanAccess, setStudentOrgCanAccess] = useState(false);
+  const [hasStudentOrganization, setHasStudentOrganization] = useState(false);
+  const [deleteOrgLoading, setDeleteOrgLoading] = useState(false);
+>>>>>>> Stashed changes
   const menuRef = useRef<HTMLUListElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
 >>>>>>> upstream/dev
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStudentOrgMenuState = async () => {
+      if (!user?.uid || !API_BASE_URL) {
+        setStudentOrgCanAccess(false);
+        setHasStudentOrganization(false);
+        return;
+      }
+
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["token"] = token;
+
+        const accessRes = await fetch(`${API_BASE_URL}/api/student-organizations/can-access`, {
+          headers,
+        });
+        if (!accessRes.ok) {
+          if (!cancelled) {
+            setStudentOrgCanAccess(false);
+            setHasStudentOrganization(false);
+          }
+          return;
+        }
+        if (cancelled) return;
+        const accessJson = (await accessRes.json()) as { canAccess?: boolean };
+        const canAccess = Boolean(accessJson.canAccess);
+        setStudentOrgCanAccess(canAccess);
+        if (!canAccess) {
+          setHasStudentOrganization(false);
+          return;
+        }
+
+        const orgRes = await fetch(
+          `${API_BASE_URL}/api/student-organizations/firebase/${user.uid}`,
+          { headers },
+        );
+        if (!cancelled) setHasStudentOrganization(orgRes.ok);
+      } catch {
+        if (!cancelled) {
+          setStudentOrgCanAccess(false);
+          setHasStudentOrganization(false);
+        }
+      }
+    };
+
+    void loadStudentOrgMenuState();
+
+    const onOrgChanged = () => void loadStudentOrgMenuState();
+    window.addEventListener(STUDENT_ORG_CHANGED_EVENT, onOrgChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(STUDENT_ORG_CHANGED_EVENT, onOrgChanged);
+    };
+  }, [user?.uid]);
+
+  const handleDeleteStudentOrganization = async () => {
+    if (
+      !confirm(
+        "Delete your student organization profile? This removes your org page and cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    setDeleteOrgLoading(true);
+    try {
+      await DELETE("/api/student-organizations");
+      setHasStudentOrganization(false);
+      window.dispatchEvent(new CustomEvent(STUDENT_ORG_CHANGED_EVENT));
+      navigate("/student-org-profile");
+    } catch {
+      alert("Could not delete your organization. Try again.");
+    } finally {
+      setDeleteOrgLoading(false);
+    }
+  };
 
   const toggleMobileMenu = () => setMobileMenuOpen((o) => !o);
 
@@ -288,8 +381,53 @@ export function Navbar() {
               title="Sign Out"
               className="w-9 h-9 rounded-full bg-ucsd-blue text-white flex items-center justify-center font-jetbrains font-bold text-sm hover:brightness-90 transition"
             >
+<<<<<<< Updated upstream
               {user.displayName?.[0]?.toUpperCase() ?? "U"}
             </button>
+=======
+              <button
+                title="Profile"
+                className="w-9 h-9 rounded-full bg-ucsd-blue text-white flex items-center justify-center font-jetbrains font-bold text-sm hover:brightness-90 transition"
+              >
+                {user.displayName?.[0]?.toUpperCase() ?? "U"}
+              </button>
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 top-full min-w-[11rem] bg-white text-black shadow-lg rounded-lg py-2 z-[60]">
+                  <a
+                    href="/profile"
+                    className="block w-full text-left px-4 py-2 text-sm font-inter hover:bg-gray-100 transition-colors"
+                  >
+                    My Profile
+                  </a>
+                  {studentOrgCanAccess && (
+                    <a
+                      href="/student-org-profile"
+                      className="block w-full text-left px-4 py-2 text-sm font-inter hover:bg-gray-100 transition-colors text-ucsd-blue"
+                    >
+                      My Organization
+                    </a>
+                  )}
+                  {studentOrgCanAccess && hasStudentOrganization && (
+                    <button
+                      type="button"
+                      disabled={deleteOrgLoading}
+                      onClick={() => void handleDeleteStudentOrganization()}
+                      className="w-full text-left px-4 py-2 text-sm font-inter hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+                    >
+                      {deleteOrgLoading ? "Deleting…" : "Delete Organization"}
+                    </button>
+                  )}
+                  <hr className="my-1 border-gray-200" />
+                  <button
+                    onClick={signOutFromFirebase}
+                    className="w-full text-left px-4 py-2 text-sm font-inter hover:bg-red-50 text-red-600 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+>>>>>>> Stashed changes
           ) : (
             <button
               onClick={openGoogleAuthentication}
@@ -356,6 +494,49 @@ export function Navbar() {
                 Products
               </button>
             </li>
+            {user && (
+              <>
+                <li className="mb-1 border-t border-gray-100 mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate("/profile");
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    My Profile
+                  </button>
+                </li>
+                {studentOrgCanAccess && (
+                  <li className="mb-1">
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        navigate("/student-org-profile");
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition text-ucsd-blue font-semibold"
+                    >
+                      My Organization
+                    </button>
+                  </li>
+                )}
+                {studentOrgCanAccess && hasStudentOrganization && (
+                  <li className="mb-1">
+                    <button
+                      type="button"
+                      disabled={deleteOrgLoading}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        void handleDeleteStudentOrganization();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 transition text-red-600 disabled:opacity-50"
+                    >
+                      {deleteOrgLoading ? "Deleting…" : "Delete Organization"}
+                    </button>
+                  </li>
+                )}
+              </>
+            )}
             <li className="border-t border-gray-100 mt-1 pt-1">
               {user ? (
                 <button

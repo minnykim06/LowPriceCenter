@@ -1,5 +1,6 @@
 import { Response } from "express";
 import StudentOrganizationModel from "src/models/studentOrganization";
+import MerchModel from "src/models/merch";
 import { AuthenticatedRequest } from "src/validators/authUserMiddleware";
 import { hasStudentOrgAccess } from "src/validators/studentOrgAccess";
 import mongoose from "mongoose";
@@ -234,11 +235,14 @@ export const deleteStudentOrganization = async (req: AuthenticatedRequest, res: 
     if (!req.user) return res.status(404).json({ message: "User not found" });
 
     const firebaseUid = req.user.firebaseUid;
-    const organization = await StudentOrganizationModel.findOneAndDelete({ firebaseUid });
+    const organization = await StudentOrganizationModel.findOne({ firebaseUid });
 
     if (!organization) {
       return res.status(404).json({ message: "Student organization not found" });
     }
+
+    await MerchModel.deleteMany({ studentOrganizationId: organization._id });
+    await StudentOrganizationModel.deleteOne({ firebaseUid });
 
     res.status(200).json({
       message: "Student organization successfully deleted",

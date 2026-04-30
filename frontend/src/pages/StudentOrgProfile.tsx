@@ -1,7 +1,9 @@
-import { FormEvent, useContext, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { get, post, patch, DELETE } from "src/api/requests";
 import { FirebaseContext } from "src/utils/FirebaseProvider";
+import { STUDENT_ORG_CHANGED_EVENT } from "src/utils/studentOrgEvents";
+import { getToken } from "src/utils/User";
 import { faStar } from "@fortawesome/free-regular-svg-icons";
 import { faStar as faStarSolid } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -31,6 +33,7 @@ interface MerchItem {
   studentOrganizationId: string;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export function StudentOrgProfile() {
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB limit
@@ -64,6 +67,7 @@ export function StudentOrgProfile() {
   const [editingMerchId, setEditingMerchId] = useState<string | null>(null);
   const [merchError, setMerchError] = useState<string>("");
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const merchNameRef = useRef<HTMLInputElement>(null);
   const merchPriceRef = useRef<HTMLInputElement>(null);
@@ -72,45 +76,68 @@ export function StudentOrgProfile() {
   const [merchImagePreview, setMerchImagePreview] = useState<string>("");
   const [newMerchImage, setNewMerchImage] = useState<File | null>(null);
 
-  useEffect(() => {
-    const checkAccessAndFetch = async () => {
-      if (!user?.uid) {
+  const loadOrgProfile = useCallback(async () => {
+    if (!user?.uid || !API_BASE_URL) {
+      setCanAccessMyOrg(false);
+      setOrganization(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["token"] = token;
+
+      const accessRes = await fetch(`${API_BASE_URL}/api/student-organizations/can-access`, {
+        headers,
+      });
+      if (!accessRes.ok) {
         setCanAccessMyOrg(false);
-        setLoading(false);
+        setOrganization(null);
         return;
       }
-
-      try {
-        setLoading(true);
-        const accessRes = await get("/api/student-organizations/can-access");
-        const accessData = await accessRes.json();
-        if (!accessData.canAccess) {
-          setCanAccessMyOrg(false);
-          setLoading(false);
-          return;
-        }
-        setCanAccessMyOrg(true);
-
-        const res = await get(`/api/student-organizations/firebase/${user.uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrganization(data);
-          setProfilePicturePreview(data.profilePicture || "");
-        } else if (res.status === 404) {
-          setOrganization(null);
-        } else {
-          setError("Failed to load organization profile");
-        }
-      } catch (err) {
-        setCanAccessMyOrg((prev) => (prev === true ? true : false));
+      const accessData = (await accessRes.json()) as { canAccess?: boolean };
+      if (!accessData.canAccess) {
+        setCanAccessMyOrg(false);
         setOrganization(null);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
+      setCanAccessMyOrg(true);
 
-    checkAccessAndFetch();
+      const res = await fetch(
+        `${API_BASE_URL}/api/student-organizations/firebase/${user.uid}`,
+        { headers },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setOrganization(data);
+        setProfilePicturePreview(data.profilePicture || "");
+      } else if (res.status === 404) {
+        setOrganization(null);
+        setProfilePicturePreview("");
+      } else {
+        setError("Failed to load organization profile");
+      }
+    } catch {
+      setCanAccessMyOrg(false);
+      setOrganization(null);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    void loadOrgProfile();
+  }, [loadOrgProfile]);
+
+  useEffect(() => {
+    const onOrgChanged = () => void loadOrgProfile();
+    window.addEventListener(STUDENT_ORG_CHANGED_EVENT, onOrgChanged);
+    return () => window.removeEventListener(STUDENT_ORG_CHANGED_EVENT, onOrgChanged);
+  }, [loadOrgProfile]);
 
   useEffect(() => {
     const fetchMerch = async () => {
@@ -183,7 +210,9 @@ export function StudentOrgProfile() {
         const data = await res.json();
         setOrganization(data);
         setIsEditing(false);
+        setShowCreateForm(false);
         setError("");
+        window.dispatchEvent(new CustomEvent(STUDENT_ORG_CHANGED_EVENT));
       } else {
         const errorData = await res.json();
         setError(errorData.message || "Failed to create organization profile");
@@ -233,6 +262,7 @@ export function StudentOrgProfile() {
         const data = await res.json();
         setOrganization(data.organization);
         setIsEditing(false);
+        setShowEditModal(false);
         setError("");
         setNewProfilePicture(null);
       } else {
@@ -248,9 +278,19 @@ export function StudentOrgProfile() {
 
   const handleCancel = () => {
     setIsEditing(false);
+    setShowEditModal(false);
     setNewProfilePicture(null);
     setProfilePicturePreview(organization?.profilePicture || "");
     setFileError(null);
+  };
+
+  const handleBackFromCreate = () => {
+    setShowCreateForm(false);
+    setNewProfilePicture(null);
+    setProfilePicturePreview("");
+    setFileError(null);
+    setError("");
+    if (profilePictureRef.current) profilePictureRef.current.value = "";
   };
 
   // Merch management functions
@@ -397,8 +437,8 @@ export function StudentOrgProfile() {
         <Helmet>
           <title>Student Organization Profile - Low-Price Center</title>
         </Helmet>
-        <div className="w-full mt-12 mb-6">
-          <p className="text-center font-inter">Loading...</p>
+        <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4 flex justify-center items-start">
+          <p className="text-center font-inter text-gray-600">Loading…</p>
         </div>
       </>
     );
@@ -410,35 +450,86 @@ export function StudentOrgProfile() {
         <Helmet>
           <title>Access denied - Low-Price Center</title>
         </Helmet>
-        <div className="w-full mt-12 mb-6 max-w-xl mx-auto p-4 text-center">
-          <p className="font-inter text-gray-700">
-            You don&apos;t have access to My Organization. Only approved organization accounts can create and manage a profile.
-          </p>
+        <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4">
+          <div className="max-w-xl mx-auto bg-white shadow-md rounded-lg p-8 text-center">
+            <p className="font-inter text-gray-700">
+              You don&apos;t have access to My Organization. Only approved organization accounts can create and manage a profile.
+            </p>
+          </div>
         </div>
       </>
     );
   }
 
   const isCreating = !organization;
+  const showOrgForm =
+    (!organization && showCreateForm) || (!!organization && (isEditing || showEditModal));
 
-  // Render create/edit form in modal
-  if (isCreating || isEditing || showEditModal) {
+  if (!organization && !showOrgForm) {
+    return (
+      <>
+        <Helmet>
+          <title>My organization - Low-Price Center</title>
+        </Helmet>
+        <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4">
+          <div className="max-w-3xl mx-auto bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="h-28 bg-ucsd-blue" />
+            <div className="px-6 pb-8 pt-6 text-center">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800 font-jetbrains">
+                My student organization
+              </h1>
+              <p className="mt-3 text-gray-600 font-inter max-w-md mx-auto">
+                You haven&apos;t created an organization profile yet. Add your group&apos;s details and merch so students can find you on{" "}
+                <a href="/student-organizations" className="text-ucsd-blue hover:underline font-medium">
+                  Student Organizations
+                </a>
+                .
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(true)}
+                  className="bg-ucsd-blue text-white font-semibold font-inter py-2.5 px-6 rounded-lg shadow hover:brightness-95 transition"
+                >
+                  Create organization
+                </button>
+                <a
+                  href="/student-organizations"
+                  className="inline-flex items-center justify-center border border-gray-200 text-gray-700 font-inter font-semibold py-2.5 px-6 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Browse organizations
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Render create/edit form
+  if (showOrgForm) {
     return (
       <>
         <Helmet>
           <title>
-            {isCreating ? "Create" : "Edit"} - Student Organization Profile
+            {isCreating ? "Create organization" : "Edit organization"} · Low-Price Center
           </title>
         </Helmet>
-        <div className="w-full mt-12 mb-20">
-          <div className="max-w-2xl mx-auto p-4">
-            <h1 className="text-3xl text-center font-jetbrains font-medium mb-6">
-              {isCreating ? "Create Student Organization Profile" : "Edit Profile"}
+        <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-2xl md:text-3xl text-center font-jetbrains font-semibold text-gray-800 mb-2">
+              {isCreating ? "Create your organization" : "Edit organization"}
             </h1>
+            <p className="text-center text-gray-600 font-inter text-sm mb-6">
+              {isCreating
+                ? "Name is required; other fields help students discover your group."
+                : "Update how your organization appears on the site."}
+            </p>
 
             <form
               onSubmit={isCreating ? handleCreate : handleUpdate}
-              className="bg-white rounded-lg shadow-md p-6"
+              className="bg-white rounded-lg shadow-md border border-gray-100 p-6 md:p-8"
             >
               {/* Profile Picture */}
               <div className="mb-6">
@@ -566,16 +657,20 @@ export function StudentOrgProfile() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-between gap-3 mt-6">
-                {!isCreating && (
+              <div className="flex flex-wrap justify-between gap-3 mt-8">
+                {isCreating ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setShowEditModal(false);
-                      handleCancel();
-                    }}
-                    className="bg-gray-500 text-white font-semibold font-inter py-2 px-4 shadow-lg hover:brightness-90 transition-all"
+                    onClick={handleBackFromCreate}
+                    className="bg-gray-500 text-white font-semibold font-inter py-2 px-4 rounded-lg hover:brightness-95 transition"
+                  >
+                    Back
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="bg-gray-500 text-white font-semibold font-inter py-2 px-4 rounded-lg hover:brightness-95 transition"
                   >
                     Cancel
                   </button>
@@ -583,9 +678,9 @@ export function StudentOrgProfile() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-[#00629B] text-white font-semibold font-inter py-2 px-4 shadow-lg hover:brightness-90 transition-all ml-auto"
+                  className="bg-ucsd-blue text-white font-semibold font-inter py-2 px-6 rounded-lg shadow hover:brightness-95 transition ml-auto disabled:opacity-60"
                 >
-                  {isSubmitting ? "Saving..." : isCreating ? "Create Profile" : "Save Changes"}
+                  {isSubmitting ? "Saving…" : isCreating ? "Create profile" : "Save changes"}
                 </button>
               </div>
 
@@ -601,176 +696,162 @@ export function StudentOrgProfile() {
   return (
     <>
       <Helmet>
-        <title>{organization?.organizationName || "Student Organization"} - Low-Price Center</title>
+        <title>{organization?.organizationName || "My organization"} · Low-Price Center</title>
       </Helmet>
-      <div className="w-full mt-6 mb-20">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="bg-white rounded-2xl border-2 border-figma-mint shadow-md overflow-hidden">
-            {/* Header band */}
-            <div className="bg-figma-sand border-b-2 border-figma-orange h-28 md:h-32 relative">
-              {/* profile image */}
-              <div className="absolute left-6 md:left-10 top-10 md:top-12">
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-white p-1 shadow-sm">
-                  {organization?.profilePicture ? (
-                    <img
-                      src={organization.profilePicture}
-                      alt={organization.organizationName}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gray-200" />
-                  )}
-                </div>
-              </div>
+      <div className="min-h-screen bg-gray-50 pt-24 pb-12 px-4">
+        <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg overflow-hidden border border-gray-100">
+          <div className="h-32 md:h-36 bg-ucsd-blue" />
 
-              {/* title */}
-              <div className="absolute left-36 md:left-44 top-6 md:top-7">
-                <h1 className="font-inter font-extrabold text-2xl md:text-4xl leading-tight text-black">
-                  {organization?.organizationName || "Username"}
-                </h1>
-              </div>
-
-              {/* edit */}
-              <div className="absolute right-6 md:right-10 top-6 md:top-7">
-                <button
-                  onClick={() => {
-                    setIsEditing(true);
-                    setShowEditModal(true);
-                  }}
-                  className="bg-figma-orange text-black font-inter font-extrabold px-8 py-2 rounded-md shadow-sm hover:brightness-95 transition-all"
-                >
-                  Edit
-                </button>
+          <div className="relative px-6 md:px-8 pb-4 border-b border-gray-100">
+            <div className="absolute -top-14 md:-top-16 left-6 md:left-8">
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-white border-4 border-white shadow-lg overflow-hidden">
+                {organization?.profilePicture ? (
+                  <img
+                    src={organization.profilePicture}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200" />
+                )}
               </div>
             </div>
 
-            {/* Info row */}
-            <div className="px-6 md:px-10 pt-8 pb-4">
-              <StarRating rating={0} />
-              <div className="mt-2 text-sm md:text-base text-gray-400 font-inter leading-snug">
-                {organization?.bio ? <div className="truncate">{organization.bio}</div> : null}
-                {organization?.contactInfo?.email ? (
-                  <div className="truncate">{organization.contactInfo.email}</div>
-                ) : null}
-                {organization?.merchLocation ? <div className="truncate">{organization.merchLocation}</div> : null}
-              </div>
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(true);
+                  setShowEditModal(true);
+                }}
+                className="bg-ucsd-blue text-white font-inter font-semibold px-4 py-2 rounded-lg hover:brightness-95 transition text-sm shadow-sm"
+              >
+                Edit profile
+              </button>
             </div>
 
-            {/* Tabs */}
-            <div className="px-6 md:px-10 pb-4">
-              <div className="flex gap-10">
-                <button
-                  onClick={() => setActiveTab("selling")}
-                  className={[
-                    "font-inter text-xl md:text-2xl font-semibold",
-                    activeTab === "selling"
-                      ? "text-figma-charcoal underline underline-offset-8"
-                      : "text-gray-400",
-                  ].join(" ")}
-                >
-                  Selling
-                </button>
-                <button
-                  onClick={() => setActiveTab("likes")}
-                  className={[
-                    "font-inter text-xl md:text-2xl font-semibold",
-                    activeTab === "likes"
-                      ? "text-figma-charcoal underline underline-offset-8"
-                      : "text-gray-400",
-                  ].join(" ")}
-                >
-                  Likes
-                </button>
-                <button
-                  onClick={() => setActiveTab("saves")}
-                  className={[
-                    "font-inter text-xl md:text-2xl font-semibold",
-                    activeTab === "saves"
-                      ? "text-figma-charcoal underline underline-offset-8"
-                      : "text-gray-400",
-                  ].join(" ")}
-                >
-                  Saves
-                </button>
-              </div>
+            <div className="pt-12 md:pt-14">
+              <h1 className="font-inter font-bold text-2xl md:text-3xl text-gray-900">
+                {organization?.organizationName}
+              </h1>
+              {organization?.location ? (
+                <p className="text-sm text-gray-600 font-inter mt-1">{organization.location}</p>
+              ) : null}
             </div>
+          </div>
 
-            {/* Content */}
-            <div className="px-6 md:px-10 pb-10">
-              {activeTab !== "selling" ? (
-                <div className="py-10 text-center text-gray-500 font-inter">Nothing to show yet.</div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  {merchItems.map((merch) => (
-                    <div key={merch._id} className="bg-white relative group">
-                      <div className="aspect-square rounded-2xl bg-gray-100 overflow-hidden shadow-sm">
-                        {merch.image ? (
-                          <img src={merch.image} alt={merch.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-gray-100" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="font-inter font-bold text-sm md:text-base text-black truncate">
-                          {merch.name}
-                        </div>
-                        <div className="font-inter font-extrabold text-sm md:text-base text-black">
-                          ${merch.price.toFixed(0)}
-                        </div>
-                      </div>
+          <div className="px-6 md:px-8 pt-2 pb-4 border-b border-gray-100">
+            <StarRating rating={0} />
+            <div className="mt-4 space-y-2 text-sm md:text-base text-gray-600 font-inter">
+              {organization?.bio ? <p className="whitespace-pre-wrap">{organization.bio}</p> : null}
+              {organization?.contactInfo?.email ? <p>{organization.contactInfo.email}</p> : null}
+              {organization?.contactInfo?.instagram ? (
+                <p className="text-ucsd-blue">@{organization.contactInfo.instagram.replace(/^@/, "")}</p>
+              ) : null}
+              {organization?.merchLocation ? (
+                <p>
+                  <span className="font-medium text-gray-800">Merch: </span>
+                  {organization.merchLocation}
+                </p>
+              ) : null}
+            </div>
+            <p className="mt-4 text-xs text-gray-500 font-inter">
+              To remove your organization entirely, use{" "}
+              <span className="font-medium text-gray-700">Delete organization</span> in the profile menu (avatar).
+            </p>
+          </div>
 
-                      {/* Edit/Delete buttons on hover */}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                        <button
-                          onClick={() => startEditingMerch(merch)}
-                          className="bg-figma-teal text-white p-2 rounded-full shadow-sm hover:brightness-95 transition-all"
-                          title="Edit"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMerch(merch._id)}
-                          className="bg-figma-charcoal text-white p-2 rounded-full shadow-sm hover:brightness-95 transition-all"
-                          title="Delete"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
+          <div className="px-6 md:px-8 py-4 border-b border-gray-100">
+            <div className="flex gap-6 md:gap-8 flex-wrap">
+              {(["selling", "likes", "saves"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={[
+                    "font-inter text-base md:text-lg font-semibold pb-1 border-b-2 transition-colors capitalize",
+                    activeTab === tab
+                      ? "text-ucsd-blue border-ucsd-blue"
+                      : "text-gray-400 border-transparent hover:text-gray-600",
+                  ].join(" ")}
+                >
+                  {tab === "selling" ? "Merch" : tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="px-6 md:px-8 py-8">
+            {activeTab !== "selling" ? (
+              <div className="py-12 text-center text-gray-500 font-inter text-sm">Nothing to show yet.</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                {merchItems.map((merch) => (
+                  <div key={merch._id} className="relative group">
+                    <div className="aspect-square rounded-lg bg-gray-100 overflow-hidden border border-gray-100">
+                      {merch.image ? (
+                        <img src={merch.image} alt={merch.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 gap-2">
+                      <div className="font-inter font-semibold text-sm text-gray-900 truncate">{merch.name}</div>
+                      <div className="font-inter font-semibold text-sm text-ucsd-blue shrink-0">
+                        ${merch.price.toFixed(0)}
                       </div>
                     </div>
-                  ))}
 
-                  {/* Add Product Button */}
-                  <button
-                    onClick={() => setIsAddingMerch(true)}
-                    className="aspect-square rounded-2xl bg-gray-100 hover:bg-gray-200 transition-colors flex items-center justify-center shadow-sm"
-                    aria-label="Add product"
-                  >
-                    <div className="text-center">
-                      <div className="w-16 h-16 mx-auto flex items-center justify-center">
-                        <span className="text-6xl text-gray-300 font-light">+</span>
-                      </div>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEditingMerch(merch)}
+                        className="bg-ucsd-blue text-white p-2 rounded-full shadow-md hover:brightness-95 transition"
+                        title="Edit"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMerch(merch._id)}
+                        className="bg-gray-800 text-white p-2 rounded-full shadow-md hover:brightness-95 transition"
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                  </button>
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
 
-                {/* Add Merch Form Modal */}
-                {isAddingMerch && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddingMerch(true)}
+                  className="aspect-square rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center border-2 border-dashed border-gray-200"
+                  aria-label="Add merch"
+                >
+                  <span className="text-5xl text-gray-300 font-light leading-none">+</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Add Merch Form Modal */}
+        {isAddingMerch && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
                       <div className="flex justify-between items-center mb-4">
@@ -841,19 +922,19 @@ export function StudentOrgProfile() {
                           </button>
                           <button
                             type="submit"
-                            className="bg-[#00629B] text-white font-semibold font-inter py-2 px-4 shadow-lg hover:brightness-90 transition-all"
+                            className="bg-ucsd-blue text-white font-semibold font-inter py-2 px-4 rounded-lg hover:brightness-95 transition"
                           >
-                            Add Product
+                            Add product
                           </button>
                         </div>
                       </form>
                       {merchError && <p className="text-sm text-red-600 mt-4">{merchError}</p>}
                     </div>
                   </div>
-                )}
+        )}
 
-                {/* Edit Merch Modal */}
-                {editingMerchId && (
+        {/* Edit Merch Modal */}
+        {editingMerchId && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
                       <div className="flex justify-between items-center mb-4">
@@ -932,9 +1013,9 @@ export function StudentOrgProfile() {
                               </button>
                               <button
                                 type="submit"
-                                className="bg-[#00629B] text-white font-semibold font-inter py-2 px-4 shadow-lg hover:brightness-90 transition-all"
+                                className="bg-ucsd-blue text-white font-semibold font-inter py-2 px-4 rounded-lg hover:brightness-95 transition"
                               >
-                                Save Changes
+                                Save changes
                               </button>
                               <button
                                 type="button"
@@ -949,9 +1030,7 @@ export function StudentOrgProfile() {
                       {merchError && <p className="text-sm text-red-600 mt-4">{merchError}</p>}
                     </div>
                   </div>
-                )}
-          </div>
-        </div>
+        )}
       </div>
     </>
   );

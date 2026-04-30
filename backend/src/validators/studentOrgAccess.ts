@@ -3,13 +3,8 @@ import env from "src/util/validateEnv";
 import { AuthenticatedRequest } from "src/validators/authUserMiddleware";
 
 /**
- * Emails that can have their own "My Organization" profile and manage merch.
- * Only these users can create/edit their org and add/edit/delete merch.
- * Leave empty [] to use STUDENT_ORG_ALLOWED_EMAILS from .env instead.
- *
- * Add allowed emails here, e.g.:
- *   "mik127@ucsd.edu",
- *   "another-org@ucsd.edu",
+ * Extra allowlist entries (merged with STUDENT_ORG_ALLOWED_EMAILS from .env).
+ * Both lists apply: add long-lived defaults here and/or set STUDENT_ORG_ALLOWED_EMAILS in .env.
  */
 const ALLOWED_ORGANIZATION_EMAILS: string[] = [
   // "mik127@ucsd.edu",
@@ -17,17 +12,14 @@ const ALLOWED_ORGANIZATION_EMAILS: string[] = [
 
 function allowedEmailsSet(): Set<string> {
   const fromCode = ALLOWED_ORGANIZATION_EMAILS.map((e) => e.trim().toLowerCase()).filter(Boolean);
-  if (fromCode.length > 0) {
-    return new Set(fromCode);
-  }
   const raw = env.STUDENT_ORG_ALLOWED_EMAILS || "";
-  if (!raw.trim()) return new Set();
-  return new Set(
-    raw
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const fromEnv = raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const combined = [...fromCode, ...fromEnv];
+  if (!combined.length) return new Set();
+  return new Set(combined);
 }
 
 /** Returns whether the given email can have "My Organization" access. */
@@ -39,8 +31,7 @@ export function hasStudentOrgAccess(email: string): boolean {
 
 /**
  * Middleware that restricts "My Organization" to allowed emails only.
- * Allowed list: ALLOWED_ORGANIZATION_EMAILS in this file (if non-empty),
- * otherwise STUDENT_ORG_ALLOWED_EMAILS in .env. Use after authenticateUser.
+ * Union of ALLOWED_ORGANIZATION_EMAILS and STUDENT_ORG_ALLOWED_EMAILS (.env). Use after authenticateUser.
  */
 export const requireStudentOrgAccess = (
   req: AuthenticatedRequest,

@@ -469,7 +469,7 @@ export function StudentOrgProfile() {
     return (
       <>
         <Helmet>
-          <title>My organization - Low-Price Center</title>
+          <title>My Organization - Low-Price Center</title>
         </Helmet>
         <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4">
           <div className="max-w-3xl mx-auto bg-white shadow-md rounded-lg overflow-hidden">
@@ -757,7 +757,7 @@ export function StudentOrgProfile() {
             </div>
             <p className="mt-4 text-xs text-gray-500 font-inter">
               To remove your organization entirely, use{" "}
-              <span className="font-medium text-gray-700">Delete organization</span> in the profile menu (avatar).
+              <span className="font-medium text-gray-700">Delete Organization</span> in the profile menu (avatar).
             </p>
           </div>
 

@@ -12,17 +12,20 @@ export default function SearchBar({ setProducts, setError: _setError }: Props) {
 
   const handleChange = (value: string) => {
     setQuery(value);
+    setError("");
     setProducts(value);
   };
 
   useEffect(() => {
-    setQuery(searchParams.get("query"));
+    setError("");
+    setQuery(searchParams.get("query") || "");
   }, [searchParams]);
 
   return (
     <input
       type="text"
       onChange={(e) => handleChange(e.target.value)}
+      value={query ?? ""}
       placeholder="Search for a product..."
       className="w-full bg-[#F8F8F8] shadow-md p-3 px-6 mx-auto my-2 rounded-3xl"
     />

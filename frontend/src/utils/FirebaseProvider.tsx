@@ -12,14 +12,14 @@ const FirebaseContext = createContext<{
   app: FirebaseApp | undefined;
   user: User | null;
   loading: boolean;
-  openGoogleAuthentication: () => void;
-  signOutFromFirebase: () => void;
+  openGoogleAuthentication: () => Promise<void>;
+  signOutFromFirebase: () => Promise<void>;
 }>({
   app: undefined,
   user: null,
   loading: true,
-  openGoogleAuthentication: () => {},
-  signOutFromFirebase: () => {},
+  openGoogleAuthentication: async () => {},
+  signOutFromFirebase: async () => {},
 });
 
 /**
